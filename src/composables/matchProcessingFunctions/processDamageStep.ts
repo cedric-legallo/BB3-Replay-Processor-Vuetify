@@ -10,6 +10,8 @@ import { DamageStep } from "@/types/messageData/DamageStep";
 import { ResultInjuryRoll } from "@/types/messageData/ResultInjuryRoll";
 import { ResultRoll } from "@/types/messageData/ResultRoll";
 import { processDieRoll } from "../helperFns/processDieRoll";
+import { ResultCasualtyRoll } from "@/types/messageData/ResultCasualtyRoll";
+import { QuestionKORecovery } from "@/types/messageData/QuestionKORecovery";
 
 export const processDamageStep = (opts: {
   stepResult: Step;
@@ -52,9 +54,19 @@ export const processDamageStep = (opts: {
         // This tells us the result of a roll
         // it has data such as the type of roll, the value rolled and the target value
         // it also tells us if the roll was a success or a failure
-
+        const damageActions: Record<string, string> = {
+          '10': 'armor',
+          '46': 'regeneration',
+        }
         const resultMessageData = xmlToJson(result.MessageData)
           .ResultRoll as ResultRoll;
+        console.log('Damage ResultRoll', resultMessageData);
+        matchData.dieRollLog.push({
+          action: damageActions[resultMessageData.RollType] ?? 'unknown',
+          playerId: stepMessageData.PlayerId,
+          dice: Array.isArray(resultMessageData.Dice.Die) ? resultMessageData.Dice.Die : [resultMessageData.Dice.Die],
+          rerolledDice: [],
+        });
 
         // resultMessageData.Difficulty is the modified target number
         // resultMessageData.Dice[] are the dice rolled
@@ -108,7 +120,13 @@ export const processDamageStep = (opts: {
 
         const resultMessageData = xmlToJson(result.MessageData)
           .ResultInjuryRoll as ResultInjuryRoll;
-
+        console.log('Damage ResultInjuryRoll', resultMessageData);
+        matchData.dieRollLog.push({
+          action: "injury",
+          playerId: stepMessageData.PlayerId,
+          dice: Array.isArray(resultMessageData.Dice.Die) ? resultMessageData.Dice.Die : [resultMessageData.Dice.Die],
+          rerolledDice: [],
+        });
         if (Array.isArray(resultMessageData.Dice.Die)) {
           resultMessageData.Dice.Die.forEach((die) => {
             processDieRoll({
@@ -170,9 +188,15 @@ export const processDamageStep = (opts: {
       case "ResultCasualtyRoll": {
         // this doens thappen very frequently, needs testing what it tells us
 
-        // const resultMessageData = xmlToJson(result.MessageData)
-        //   .ResultCasualtyRoll as ResultCasualtyRoll;
-
+        const resultMessageData = xmlToJson(result.MessageData)
+           .ResultCasualtyRoll as ResultCasualtyRoll;
+        console.log('Damage ResultCasualtyRoll', resultMessageData);
+        matchData.dieRollLog.push({
+          action: "casualty",
+          playerId: stepMessageData.PlayerId,
+          dice: Array.isArray(resultMessageData.Dice.Die) ? resultMessageData.Dice.Die : [resultMessageData.Dice.Die],
+          rerolledDice: [],
+        });
         // Add ResultCasualtyRoll data to the currentTurnAction
         // currentTurn.injury = true;
         // currentTurnAction.actionsTaken.injuryInflicted = "ResultCasualtyRoll";
@@ -249,7 +273,21 @@ export const processDamageStep = (opts: {
 
         break;
       }
+      case "QuestionKORecovery": {
+        // This asks the client if the player wants to use a skill to recover from KO like Apothecary
+        const resultMessageData = xmlToJson(result.MessageData)
+          .QuestionKORecovery as QuestionKORecovery;
+        console.log('Damage QuestionKORecovery', resultMessageData);
+        matchData.dieRollLog.push({
+          action: "injury healed",
+          playerId: stepMessageData.PlayerId,
+          dice: Array.isArray(resultMessageData.RollInfos.Dice.Die) ? resultMessageData.RollInfos.Dice.Die : [resultMessageData.RollInfos.Dice.Die],
+          rerolledDice: [],
+        });
+        break;
+      }
       case "ResultTeamRerollUsage": {
+        console.log("Damage ResultTeamRerollUsage");
         // This tells us a reroll was used and by which _player_ (not by which team)
 
         // // Not yet used so commenting to save computation

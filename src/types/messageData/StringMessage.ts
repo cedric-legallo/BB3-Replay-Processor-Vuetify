@@ -6,6 +6,8 @@ export type StringMessage = {
     | "QuestionBlockDice"
     | "QuestionPushBack"
     | "QuestionFollowUp"
+    | "QuestionSkillUsage"
+    | "QuestionKORecovery"
     | "ResultBlockRoll"
     | "ResultPushBack"
     | "ResultFollowUp"
@@ -16,6 +18,7 @@ export type StringMessage = {
     | "ResultCasualtyRoll"
     | "ResultPlayerRemoval"
     | "ResultTeamRerollUsage"
+    | "QuestionTeamRerollUsage"
     | "QuestionBribeUsage"
     | "ResultPlayerSentOff";
 

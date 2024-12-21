@@ -15,6 +15,7 @@ import { Inducement } from "@/types/Inducements/Inducement";
 import { Player } from "@/types/Teams/Player";
 import { addBasePlayerData } from "./addBasePlayerData";
 import { getStarPlayerName } from "../stringFromIdFunctions/getStarPlayerName";
+import { DieRoll } from "@/types/Pitch/DieRoll";
 // import { ResultTeamRerollUsage } from "@/types/messageData/ResultTeamRerollUsage";
 // import { ResultRoll } from "@/types/messageData/ResultRoll";
 
@@ -48,6 +49,7 @@ export const processReplaySteps = (replaySteps: ReplayStep[]): MatchData => {
 
   let matchData: MatchData = {
     matchLog: [] as Turn[],
+    dieRollLog: [] as DieRoll[],
     playerData: {},
     inducements: {
       homeTeam: {},
@@ -94,7 +96,7 @@ export const processReplaySteps = (replaySteps: ReplayStep[]): MatchData => {
 
   // Itterate over the replay steps and process them
   for (const step of replaySteps) {
-    // // THIS MIGHT CAUSE AN ISSUE THAT IVE FORGOTTEN ABOUT! 
+    // // THIS MIGHT CAUSE AN ISSUE THAT IVE FORGOTTEN ABOUT!
     // // Update the game phase
     // if (step.EventNewGamePhase) {
     //   gamePhase = step.EventNewGamePhase.Phase;
@@ -258,7 +260,7 @@ export const processReplaySteps = (replaySteps: ReplayStep[]): MatchData => {
         }
       }
 
-      
+
     }
 
     if (gamePhase === "4") {
@@ -425,7 +427,7 @@ export const processReplaySteps = (replaySteps: ReplayStep[]): MatchData => {
         });
       }
 
-      
+
       if(step.EventTouchdown)  {
         // This is a touchdown event, we need to record the touchdown and the player that scored it
         currentTurnAction.actionsTaken.touchdownScored = true;
@@ -497,7 +499,7 @@ export const processReplaySteps = (replaySteps: ReplayStep[]): MatchData => {
     if (gamePhase === "6") {
       // This is the post-match phase
 
-      
+
     }
 
     if (step.EventMatchEnd) {
@@ -520,6 +522,6 @@ export const processReplaySteps = (replaySteps: ReplayStep[]): MatchData => {
     }
 
   }
-  
+
   return matchData;
 };

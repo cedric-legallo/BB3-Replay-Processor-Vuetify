@@ -1,9 +1,11 @@
 import { PlayerId } from "./IdTypes/PlayerId";
 import { Turn } from "./Match/Turn";
+import { DieRoll } from "./Pitch/DieRoll";
 import { Player } from "./Teams/Player";
 
 export type MatchData = {
   matchLog: Turn[];
+  dieRollLog: DieRoll[];
   fanFactor?: {
     home: string;
     away: string;

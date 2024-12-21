@@ -8,6 +8,7 @@
           <v-tab value="teamstats">Team Stats</v-tab>
           <v-tab value="playerstats">Player Stats</v-tab>
           <v-tab value="dicestats">Dice Stats</v-tab>
+          <v-tab value="dicelog">Dice Log</v-tab>
         </v-tabs>
 
         <v-card-text class="pa-0 ma-0">
@@ -35,6 +36,12 @@
                 Currently Unavailable
               </v-container>
             </v-window-item>
+             <!-- Dice Stats -->
+             <v-window-item value="dicelog">
+              <v-container>
+                <DiceLog />
+              </v-container>
+            </v-window-item>
           </v-window>
         </v-card-text>
       </v-card>
@@ -54,6 +61,7 @@ import Overview from "@/components/Match/Overview.vue";
 import TeamStatsWrapper from "@/components/Match/TeamStats/TeamStatsWrapper.vue";
 import PlayerStatsWrapper from "@/components/Match/PlayerStats/PlayerStatsWrapper.vue";
 import MatchLog from "@/components/Match/MatchLog/MatchLog.vue";
+import DiceLog from "@/components/Match/DiceLog/DiceLog.vue";
 import { processReplaySteps } from "@/composables/matchProcessingFunctions/processReplaySteps";
 import { useDataStore } from "@/store/dataStore";
 
@@ -95,5 +103,5 @@ dataStore.matchData = processReplaySteps(replaySteps.value as ReplayStep[])
 dataStore.setTeamData();
 
 </script>
-  
+
 <style scoped></style>

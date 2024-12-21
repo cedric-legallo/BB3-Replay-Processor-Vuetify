@@ -1,4 +1,4 @@
 export type ResultTeamRerollUsage = {
     GamerId: number;
-    Used: number;
+    Used: string;
 };

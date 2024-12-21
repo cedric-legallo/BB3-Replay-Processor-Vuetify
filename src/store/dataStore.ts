@@ -86,6 +86,8 @@ export const useDataStore = defineStore("data", () => {
       );
     }
   };
+  // Then we get the journeyMen from the event data
+  // TODO
 
   // getters
   const getPlayerName = (playerId: string) => {
@@ -127,7 +129,7 @@ export const useDataStore = defineStore("data", () => {
         colours.clash = getColourFromGuid('');
       }
     }
-    
+
     return colours;
   }
   const getPlayerType = (playerTypeId: PlayerIdType) => {

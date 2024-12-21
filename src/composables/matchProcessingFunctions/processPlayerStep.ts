@@ -11,7 +11,15 @@ import { ResultBlockOutcome } from "@/types/messageData/ResultBlockOutcome";
 import { ResultPlayerRemoval } from "@/types/messageData/ResultPlayerRemoval";
 import { ResultRoll } from "@/types/messageData/ResultRoll";
 import { ResultUseAction } from "@/types/messageData/ResultUseAction";
-import { ResultPlayerSentOff } from "@/types/messageData/ResultPlayerSentOff";
+import { QuestionBlockDice } from "@/types/messageData/QuestionBlockDice";
+import { ResultSkillUsage } from "@/types/messageData/ResultSkillUsage";
+import { processDieRoll } from "../helperFns/processDieRoll";
+import actions from "@/constants/rollActions";
+import { ResultPushBack } from "@/types/messageData/ResultPushBack";
+import { ResultMoveOutcome } from "@/types/messageData/ResultMoveOutcome";
+import { ResultTeamRerollUsage } from "@/types/messageData/ResultTeamRerollUsage";
+import { QuestionTeamRerollUsage } from "@/types/messageData/QuestionTeamRerollUsage";
+import { QuestionSkillUsage } from "@/types/messageData/QuestionSkillUsage";
 
 export const processPlayerStep = (opts: {
   stepResult: Step;
@@ -22,6 +30,7 @@ export const processPlayerStep = (opts: {
   currentTurnAction: TurnAction;
   nextTurnAction: TurnAction;
   hasBall: PlayerId | undefined;
+  previousStepResult?: ReplayStep;
 }) => {
   const {
     stepResult,
@@ -185,6 +194,8 @@ export const processPlayerStep = (opts: {
   }
 
   // Process the player step
+  let isTeamReroll = false;
+  let action = "";
 
   // Now we need to loop over the results of the action and process them
   stepResult.Results.StringMessage.forEach((result) => {
@@ -198,7 +209,6 @@ export const processPlayerStep = (opts: {
     switch (result.Name) {
       case "ResultMoveOutcome": {
         // The player has moved from one cell to another
-
         // add move data to the matchData
         matchData.playerData[stepMessageData.PlayerId].yardsMoved += 1;
 
@@ -220,74 +230,112 @@ export const processPlayerStep = (opts: {
         // This is the roll of the block dice, this gives info on what dice were rolled and the outcome
         // it also lets us know what rerolls can be used (such as Pro) and whether the defender selects the outome
 
-        // const resultMessageData = xmlToJson(result.MessageData)
-        //   .QuestionBlockDice as QuestionBlockDice;
+        const resultMessageData = xmlToJson(result.MessageData).QuestionBlockDice as QuestionBlockDice;
 
-        // // resultMessageData.Dice.Die could be an array or an object, so we need to check for that
-        // let diceRolled = [];
-        // if (Array.isArray(resultMessageData.Dice.Die)) {
-        //   diceRolled = resultMessageData.Dice.Die.map(
-        //     (die: { DieType: string; Value: string }) => {
-        //       return die.Value;
-        //     }
-        //   );
-        // } else {
-        //   diceRolled = [resultMessageData.Dice.Die.Value];
-        // }
+        // resultMessageData.Dice.Die could be an array or an object, so we need to check for that
+        let diceRolled = [];
+        if (Array.isArray(resultMessageData.Dice.Die)) {
+          diceRolled = resultMessageData.Dice.Die.map(
+            (die: { DieType: string; Value: string }) => {
+              return die.Value;
+            }
+          );
+        } else {
+          diceRolled = [resultMessageData.Dice.Die.Value];
+        }
+
+
+        console.log("QuestionBlockDice", resultMessageData);
+        if (turnActionEvent.eventResults.some((eventResult) => {
+          if (eventResult.actionName === "ResultSkillUsage") {
+            const skillResult = xmlToJson(eventResult.messageData).ResultSkillUsage as ResultSkillUsage
+            return skillResult.Skill === "50";
+          }
+          return false;
+        })) {
+          // Pro was used
+          const block = matchData.dieRollLog.splice(-2, 1)[0];
+
+          matchData.dieRollLog.push({
+            action: resultMessageData.AttackerChoice === "1" ? "block" : "block against",
+            playerId: stepMessageData.PlayerId,
+            dice: Array.isArray(resultMessageData.Dice.Die) ? resultMessageData.Dice.Die : [resultMessageData.Dice.Die],
+            rerolledCause: 'pro',
+            rerolledDice: block.dice,
+          });
+        }
+        if (isTeamReroll) {
+          isTeamReroll = false;
+          const prevActionResult = currentTurnAction.turnActionEvents.at(-1)?.eventResults.at(-1);
+          if (prevActionResult) {
+            const rerolledMessageData = xmlToJson(prevActionResult.messageData).QuestionBlockDice as QuestionBlockDice;
+            const previousRollLog = matchData.dieRollLog.at(-1);
+            if (previousRollLog) {
+              Object.assign(previousRollLog, {
+                rerolledCause: 'team reroll',
+                dice: Array.isArray(resultMessageData.Dice.Die) ? resultMessageData.Dice.Die : [resultMessageData.Dice.Die],
+                rerolledDice: Array.isArray(rerolledMessageData.Dice.Die) ? rerolledMessageData.Dice.Die : [rerolledMessageData.Dice.Die],
+                hidden: false,
+              });
+            }
+          }
+        } else {
+          matchData.dieRollLog.push({
+            action: resultMessageData.AttackerChoice === "1" ? "block" : "block against",
+            playerId: stepMessageData.PlayerId,
+            dice: Array.isArray(resultMessageData.Dice.Die) ? resultMessageData.Dice.Die : [resultMessageData.Dice.Die],
+            rerolledDice: [],
+            hidden: resultMessageData.CanChoseDie === "0"
+          });
+        }
         // const attackerChoice =
         //   resultMessageData.AttackerChoice === "1";
-        // const assists =
-        //   resultMessageData.Assists?.AssistInfos?.length || 0;
+        const assists =
+          resultMessageData.Assists?.AssistInfos?.length || 0;
         // const canUseTeamReroll =
-        //   resultMessageData.CanUseTeamReroll === "1";
+        //  resultMessageData.CanUseTeamReroll === "1";
 
         // // add roll data to the matchData
-        // diceRolled.forEach((die) => {
-        //   switch (die) {
-        //     case "1": {
-        //       matchData.playerData[
-        //         stepMessageData.PlayerId
-        //       ].blockDiceRolled.attackerDown += 1;
-        //       break;
-        //     }
-        //     case "2": {
-        //       matchData.playerData[
-        //         stepMessageData.PlayerId
-        //       ].blockDiceRolled.bothDown += 1;
-        //       break;
-        //     }
-        //     case "3": {
-        //       matchData.playerData[
-        //         stepMessageData.PlayerId
-        //       ].blockDiceRolled.push += 1;
-        //       break;
-        //     }
-        //     case "4": {
-        //       matchData.playerData[
-        //         stepMessageData.PlayerId
-        //       ].blockDiceRolled.push += 1;
-        //       break;
-        //     }
-        //     case "5": {
-        //       matchData.playerData[
-        //         stepMessageData.PlayerId
-        //       ].blockDiceRolled.defenderStumbles += 1;
-        //       break;
-        //     }
-        //     case "6": {
-        //       matchData.playerData[
-        //         stepMessageData.PlayerId
-        //       ].blockDiceRolled.defenderDown += 1;
-        //       break;
-        //     }
-        //     default: {
-        //       break;
-        //     }
-        //   }
-        // });
-        // matchData.playerData[
-        //   stepMessageData.PlayerId
-        // ].assistsReceived += assists;
+        diceRolled.forEach((die) => {
+          switch (die) {
+            case "0": {
+              matchData.playerData[
+                stepMessageData.PlayerId
+              ].blockDiceRolled.attackerDown += 1;
+              break;
+            }
+            case "1": {
+              matchData.playerData[
+                stepMessageData.PlayerId
+              ].blockDiceRolled.bothDown += 1;
+              break;
+            }
+            case "2": {
+              matchData.playerData[
+                stepMessageData.PlayerId
+              ].blockDiceRolled.push += 1;
+              break;
+            }
+            case "3": {
+              matchData.playerData[
+                stepMessageData.PlayerId
+              ].blockDiceRolled.defenderStumbles += 1;
+              break;
+            }
+            case "4": {
+              matchData.playerData[
+                stepMessageData.PlayerId
+              ].blockDiceRolled.defenderDown += 1;
+              break;
+            }
+            default: {
+              break;
+            }
+          }
+        });
+        matchData.playerData[
+          stepMessageData.PlayerId
+        ].assistsReceived += assists;
 
         // // Add block data to the currentTurnAction
         // currentTurnAction.actionsTaken.blockAttempted
@@ -383,7 +431,6 @@ export const processPlayerStep = (opts: {
 
         // const resultMessageData = xmlToJson(result.MessageData)
         //   .ResultPushBack as ResultPushBack;
-
         // // add roll data to the matchData
         // // we could use the targetData BUT I'm not certain how the output handles cascading pushes
         // // so lets grab the player data from the Id instead
@@ -405,7 +452,6 @@ export const processPlayerStep = (opts: {
 
         const resultMessageData = xmlToJson(result.MessageData)
           .ResultBlockOutcome as ResultBlockOutcome;
-
         // Add the output type to the players data
         switch (resultMessageData.Outcome) {
           case "1":
@@ -471,6 +517,73 @@ export const processPlayerStep = (opts: {
         const resultMessageData = xmlToJson(result.MessageData)
           .ResultRoll as ResultRoll;
 
+        console.log("resulRoll", action, resultMessageData);
+        if (isTeamReroll) {
+
+          matchData.dieRollLog.push({
+            action,
+            requirement: resultMessageData.Requirement,
+            rollType: resultMessageData.RollType,
+            difficulty: resultMessageData.Difficulty,
+            outcome: resultMessageData.Outcome === "1",
+            playerId: stepMessageData.PlayerId,
+            dice: Array.isArray(resultMessageData.Dice.Die) ? resultMessageData.Dice.Die : [resultMessageData.Dice.Die],
+            rerolledCause: 'team reroll',
+            rerolledDice: matchData.previousRoll ? Array.isArray(matchData.previousRoll.RollInfos.Dice.Die) ? matchData.previousRoll.RollInfos.Dice.Die : [matchData.previousRoll.RollInfos.Dice.Die] : [],
+          });
+          isTeamReroll = false;
+          delete matchData.previousRoll;
+        } else if ([
+          'catch',
+          'dodge',
+          "pass",
+          "sureFeet",
+          "sureHands",
+        ].includes(action)) {
+          const prevAction = matchData.dieRollLog.at(-1);
+          if (prevAction) {
+            Object.assign(prevAction, {
+              action,
+              requirement: resultMessageData.Requirement,
+              rollType: resultMessageData.RollType,
+              difficulty: resultMessageData.Difficulty,
+              outcome: resultMessageData.Outcome === "1",
+              playerId: stepMessageData.PlayerId,
+              rerolledDice: prevAction.dice,
+              rerolledCause: action,
+              dice: Array.isArray(resultMessageData.Dice.Die) ? resultMessageData.Dice.Die : [resultMessageData.Dice.Die],
+            });
+          }
+        } else {
+          matchData.dieRollLog.push({
+            action,
+            requirement: resultMessageData.Requirement,
+            rollType: resultMessageData.RollType,
+            difficulty: resultMessageData.Difficulty,
+            outcome: resultMessageData.Outcome === "1",
+            playerId: stepMessageData.PlayerId,
+            dice: Array.isArray(resultMessageData.Dice.Die) ? resultMessageData.Dice.Die : [resultMessageData.Dice.Die],
+            rerolledDice: [],
+          });
+        }
+        action = "";
+
+        // resultMessageData.Dice.Die could be an array or an object, so we need to check for that
+        if (Array.isArray(resultMessageData.Dice.Die)) {
+          resultMessageData.Dice.Die.forEach((die) => {
+            processDieRoll({
+              dieRoll: die,
+              playerId: stepMessageData.PlayerId,
+              matchData,
+            });
+          });
+        } else {
+          processDieRoll({
+            dieRoll: resultMessageData.Dice.Die,
+            playerId: stepMessageData.PlayerId,
+            matchData,
+          });
+        }
         // if this is a pass roll, we can add some data to the playerData
         if (stepMessageData.StepType === "11") {
           if (!currentTurnAction.actionsTaken.passAttempted) {
@@ -526,13 +639,29 @@ export const processPlayerStep = (opts: {
 
         break;
       }
+      case "QuestionSkillUsage": {
+        const resultMessageData = xmlToJson(result.MessageData).QuestionSkillUsage as QuestionSkillUsage;
+        console.log("QuestionSkillUsage", resultMessageData);
+        if (resultMessageData.RollInfos) {
+          matchData.dieRollLog.push({
+            action,
+            requirement: resultMessageData.RollInfos.Requirement,
+            rollType: resultMessageData.RollInfos.RollType,
+            difficulty: resultMessageData.RollInfos.Difficulty,
+            outcome: resultMessageData.RollInfos.Outcome === "1",
+            playerId: stepMessageData.PlayerId,
+            dice: Array.isArray(resultMessageData.RollInfos.Dice.Die) ? resultMessageData.RollInfos.Dice.Die : [resultMessageData.RollInfos.Dice.Die],
+            rerolledDice: [],
+          });
+        }
+        break;
+      }
       case "ResultSkillUsage": {
         // This tells us the skill used, and by which player
-
         // // Not yet used so commenting to save computation
-        // const resultMessageData = xmlToJson(result.MessageData)
-        //   .ResultSkillUsage as ResultSkillUsage;
-
+        const resultMessageData = xmlToJson(result.MessageData).ResultSkillUsage as ResultSkillUsage;
+        console.log("ResultSkillUsage", resultMessageData);
+        action = actions[resultMessageData.Skill];
         break;
       }
       case "ResultInjuryRoll": {
@@ -540,9 +669,9 @@ export const processPlayerStep = (opts: {
         // if successful, a ResultCasualtyRoll will follow
 
         // // Not yet used so commenting to save computation
-        // const resultMessageData = xmlToJson(message.MessageData)
-        //   .ResultInjuryRoll as ResultInjuryRoll;
-
+        const resultMessageData = xmlToJson(message.MessageData)
+           .ResultInjuryRoll as ResultInjuryRoll;
+        console.log("ResultInjuryRoll", resultMessageData);
         break;
       }
       case "ResultCasualtyRoll": {
@@ -550,8 +679,9 @@ export const processPlayerStep = (opts: {
         // on a roll of 8-12, a ResultPlayerRemoval will follow
 
         // // Not yet used so commenting to save computation
-        // const resultMessageData = xmlToJson(message.MessageData)
-        //   .ResultCasualtyRoll as ResultCasualtyRoll;
+        const resultMessageData = xmlToJson(message.MessageData)
+           .ResultCasualtyRoll as ResultCasualtyRoll;
+        console.log("ResultCasualtyRoll", resultMessageData);
 
         // Add ResultCasualtyRoll data to the currentTurnAction
         currentTurnAction.actionsTaken.injuryInflicted = {
@@ -575,12 +705,23 @@ export const processPlayerStep = (opts: {
 
         break;
       }
+      case "QuestionTeamRerollUsage": {
+        // store the previous roll
+        matchData.previousRoll = xmlToJson(result.MessageData)
+           .QuestionTeamRerollUsage as QuestionTeamRerollUsage;
+        console.log("QuestionTeamRerollUsage", matchData.previousRoll);
+        break;
+      }
       case "ResultTeamRerollUsage": {
         // This tells us a reroll was used and by which _player_ (not by which team)
+        // rerolledResultMessage = JSON.parse(JSON.stringify(previousResultMessage));
 
         // // Not yet used so commenting to save computation
-        // const resultMessageData = xmlToJson(result.MessageData)
-        //   .ResultTeamRerollUsage as ResultTeamRerollUsage;
+        const resultMessageData = xmlToJson(result.MessageData)
+           .ResultTeamRerollUsage as ResultTeamRerollUsage;
+
+        console.log("ResultTeamRerollUsage", resultMessageData);
+          isTeamReroll = resultMessageData.Used === "1";
 
         break;
       }
